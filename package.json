@@ -1,0 +1,8 @@
+{
+  "name": "cp-anticheat",
+  "type": "module",
+  "version": "1.0.0",
+  "repository": "https://github.com/as1605/CP-AntiCheat",
+  "author": "as1605 <1605.aditya.singh@gmail.com>",
+  "license": "MIT"
+}
