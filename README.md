@@ -9,3 +9,4 @@ Flagging users who copied solutions in LeetCode and CodeForces contests
 node leetcode.js weekly-contest-406
 ```
 - The codes will be saved to `data/leetcode/<contest_name_slug>/codes/<question_id>/<lang>/<user>:<submission_id>.<lang>`
+- The reports will be generated at `docs/leetcode/<contest_name_slug>`

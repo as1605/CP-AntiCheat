@@ -6,6 +6,8 @@
   "author": "as1605 <1605.aditya.singh@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@dodona/dolos": "^2.7.1",
+    "@dodona/dolos-lib": "^3.3.1",
     "ansi-colors": "^4.1.3",
     "cli-progress": "^3.12.0",
     "glob": "^11.0.0"

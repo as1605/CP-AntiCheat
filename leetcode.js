@@ -2,6 +2,7 @@ import fs from "fs";
 import * as cliProgress from "cli-progress";
 import colors from "ansi-colors";
 import { glob } from "glob";
+import { Dolos } from "@dodona/dolos-lib";
 
 const CONTEST_NAME = process.argv[2];
 
@@ -14,7 +15,8 @@ fs.mkdirSync(DIR_CODES, { recursive: true });
 
 const BASE_URL = "https://leetcode.com/contest/api/ranking/" + CONTEST_NAME;
 const headers = {
-    "Referer": "https://leetcode.com/contest/" + CONTEST_NAME + "/ranking/",
+    "Referer": "https://leetcode.com/",
+    // contest/" + CONTEST_NAME + "/ranking/",
     "Referrer-Policy": "strict-origin-when-cross-origin"
 }
 
@@ -128,7 +130,7 @@ const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "U
 
     const cache = glob.sync(root + '/*/' + file + ".*");
     if (cache.length > 0) {
-        return fs.readFileSync(cache[0], "utf-8");
+        return cache[0];
     }
 
     const domain = region === "CN" ? "leetcode.cn" : "leetcode.com";
@@ -145,16 +147,17 @@ const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "U
     const ext = data.lang === "python3" ? "py" : data.lang === "javascript" ? "js" : data.lang;
     const dir = root + '/' + ext + '/';
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(dir + file + "." + ext, data.code, "utf-8");
-    return data.code;
+    const path = dir + file + "." + ext;
+    fs.writeFileSync(path, data.code, "utf-8");
+    return path;
 }
 
-const fetchAllSubmissions = async (submissions, question_id, chunk = 10, ignoreCN = true) => {
+const fetchAllSubmissions = async (submissions, question_id, chunk = 6, ignoreCN = true) => {
     const codes = [];
     const attempts = submissions.map(({ user, questions }) => (
         {
             user,
-            question: questions.find(q => q.question_id = question_id && (!ignoreCN || q.data_region !== "CN"))
+            question: questions.find(q => q.question_id == question_id && (!ignoreCN || q.data_region !== "CN"))
         })
     ).filter(({ question }) => question);
 
@@ -188,23 +191,62 @@ const fetchAllSubmissions = async (submissions, question_id, chunk = 10, ignoreC
     return codes;
 }
 
+const publish = (round, problemName, pairs) => {
+    const breakPath = (path) => path.split("/")[path.split("/").length - 1].split(":");
+    const done = new Set();
+    const matches = pairs.filter(pair => pair.similarity === 1).map(pair => ({
+        user1: breakPath(pair.leftFile.path)[0],
+        submission1: breakPath(pair.leftFile.path)[1].split(".")[0],
+        user2: breakPath(pair.rightFile.path)[0],
+        submission2: breakPath(pair.rightFile.path)[1].split(".")[0],
+    }));
+    const rows = [];
+    matches.forEach(({ user1, submission1, user2, submission2 }) => {
+        if (!done.has(user1) || !done.has(user2)) {
+            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/)`);
+            done.add(user1);
+            done.add(user2);
+        }
+    })
+
+
+    fs.writeFileSync(`docs/leetcode/${round}.md`, `# Cheating Report for LeetCode Round [${round}](https://leetcode.com/contest/${round}/)
+
+## Problem ${problemName}
+` + rows.join("\n"));
+
+    const old = fs.readFileSync("docs/README.md");
+    fs.writeFileSync("docs/README.md", old + `\n- LeetCode Round [${round}](leetcode/${round}): **${rows.length}** Cheaters!`);
+}
+
 const run = async () => {
     console.info(":::::::: Contest:", CONTEST_NAME);
-    console.info("> Fetching page limit...");
+    console.info("\n> Fetching page limit...");
     const limit = await getPageLimit();
     console.info("=== Page Limit:", limit);
 
-    console.info("> Fetching all submissions...");
+    console.info("\n> Fetching all submissions...");
     const submissions = await fetchAllPages(limit);
 
     console.info("Total Submissions:", submissions.length);
 
-    console.info("> Fetching questions...");
+    console.info("\n> Fetching questions...");
     const questions = await fetchQuestions();
+    console.info("Total Questions:", questions.length);
+    const question = questions[process.argv[3] ?? 3];
+    console.info("=== Picked Question", question);
 
-    console.info("> Fetching codes...");
-    const codes = fetchAllSubmissions(submissions, questions[3].question_id);
+    console.info("\n> Fetching codes...");
+    const codes = await fetchAllSubmissions(submissions, question.question_id);
     console.info("Total Codes:", codes.length);
+
+    console.info("\n> Analyzing codes...");
+    const dolos = new Dolos({ minSimilarity: 0.8, maxFingerprintPercentage: 0.5 });
+    const report = await dolos.analyzePaths(codes);
+    console.log("Total Matches:", report.allPairs().filter(p => p.similarity === 1).length);
+
+    publish(CONTEST_NAME, question.title_slug, report.allPairs());
+    console.log("=== Results ===", "docs/leetcode/" + CONTEST_NAME + ".md");
 }
 
 run();
