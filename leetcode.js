@@ -1,7 +1,7 @@
 import fs from "fs";
 import * as cliProgress from "cli-progress";
 import colors from "ansi-colors";
-import { glob } from "glob";
+import FastGlob from "fast-glob";
 import { Dolos } from "@dodona/dolos-lib";
 
 const CONTEST_NAME = process.argv[2];
@@ -108,7 +108,6 @@ const fetchAllPages = async (pageLimit = 100, chunk = 1) => {
         format: 'Fetching pages... |' + colors.cyan('{bar}') + '| {percentage}% || {value}/{total} Pages || Duration: {duration_formatted}',
         barCompleteChar: '\u2588',
         barIncompleteChar: '\u2591',
-        hideCursor: true
     }, cliProgress.Presets.shades_classic);
     bar.start(pageLimit, 0);
 
@@ -128,7 +127,7 @@ const fetchAllPages = async (pageLimit = 100, chunk = 1) => {
 const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "US", retry = true) => {
     const file = user + ":" + submissionId;
 
-    const cache = glob.sync(root + '/*/' + file + ".*");
+    const cache = FastGlob.sync(root + '/*/' + file + ".*");
     if (cache.length > 0) {
         return cache[0];
     }
@@ -165,7 +164,6 @@ const fetchAllSubmissions = async (submissions, question_id, chunk = 6, ignoreCN
         format: 'Fetching submissions... |' + colors.green('{bar}') + '| {percentage}% || {value}/{total} Codes || Duration: {duration_formatted}',
         barCompleteChar: '\u2588',
         barIncompleteChar: '\u2591',
-        hideCursor: true
     }, cliProgress.Presets.shades_classic);
     bar.start(attempts.length, 0);
 
@@ -191,19 +189,20 @@ const fetchAllSubmissions = async (submissions, question_id, chunk = 6, ignoreCN
     return codes;
 }
 
-const publish = (round, problemName, pairs) => {
+const publish = (round, problemName, pairs, tolerance = 0.9) => {
     const breakPath = (path) => path.split("/")[path.split("/").length - 1].split(":");
     const done = new Set();
-    const matches = pairs.filter(pair => pair.similarity === 1).map(pair => ({
+    const matches = pairs.filter(pair => pair.similarity >= tolerance).map(pair => ({
         user1: breakPath(pair.leftFile.path)[0],
         submission1: breakPath(pair.leftFile.path)[1].split(".")[0],
         user2: breakPath(pair.rightFile.path)[0],
         submission2: breakPath(pair.rightFile.path)[1].split(".")[0],
-    }));
+        similarity: pair.similarity
+    })).filter(({ user1, user2 }) => user1 !== user2).toSorted((a, b) => b.similarity - a.similarity);
     const rows = [];
-    matches.forEach(({ user1, submission1, user2, submission2 }) => {
+    matches.forEach(({ user1, submission1, user2, submission2, similarity }) => {
         if (!done.has(user1) || !done.has(user2)) {
-            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/)`);
+            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/) (${(similarity * 100).toPrecision(4)} %)`);
             done.add(user1);
             done.add(user2);
         }
@@ -243,9 +242,8 @@ const run = async () => {
     console.info("\n> Analyzing codes...");
     const dolos = new Dolos({ minSimilarity: 0.8, maxFingerprintPercentage: 0.5 });
     const report = await dolos.analyzePaths(codes);
-    console.log("Total Matches:", report.allPairs().filter(p => p.similarity === 1).length);
 
-    publish(CONTEST_NAME, question.title_slug, report.allPairs());
+    publish(CONTEST_NAME, question.title_slug, report.allPairs(), 0.95);
     console.log("=== Results ===", "docs/leetcode/" + CONTEST_NAME + ".md");
 }
 
