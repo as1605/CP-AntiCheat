@@ -213,7 +213,7 @@ const publish = (round, problemName, pairs, tolerance = 0.9) => {
                 `[${user2}](https://leetcode.com/${user2})`,
                 `[${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/)`,
                 `[${rank2}](https://leetcode.com/contest/${round}/ranking/${rank2}/)`,
-                (similarity * 100).toPrecision(4) + " %"
+                (similarity * 100).toPrecision(4)
             ].join("|"));
             done.add(user1);
             done.add(user2);
