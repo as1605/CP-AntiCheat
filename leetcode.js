@@ -60,7 +60,7 @@ const fetchPage = async (page, minSolved = 4, retry = true) => {
         const questions = Object.values(data.submissions[i]);
         if (questions.length < minSolved) continue;
 
-        submissions.push({ user: data.total_rank[i].user_slug, questions });
+        submissions.push({ user: data.total_rank[i].user_slug, questions, rankPage: page });
     }
 
     fs.writeFileSync(path, JSON.stringify(submissions, null, 2));
@@ -124,8 +124,8 @@ const fetchAllPages = async (pageLimit = 100, chunk = 1) => {
     return submissions;
 }
 
-const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "US", retry = true) => {
-    const file = user + ":" + submissionId;
+const fetchSubmission = async (submissionId, user, rankPage, root = DIR_CODES, region = "US", retry = true) => {
+    const file = rankPage + ":" + user + ":" + submissionId;
 
     const cache = FastGlob.sync(root + '/*/' + file + ".*");
     if (cache.length > 0) {
@@ -137,7 +137,7 @@ const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "U
     if (res.status !== 200) {
         if (retry) {
             console.info("\n ## Retrying submission", submissionId);
-            return fetchSubmission(submissionId, user, root, region, false);
+            return fetchSubmission(submissionId, user, rankPage, root, region, false);
         }
         console.error("\n--- Failed to fetch submission", submissionId);
         return "";
@@ -153,10 +153,11 @@ const fetchSubmission = async (submissionId, user, root = DIR_CODES, region = "U
 
 const fetchAllSubmissions = async (submissions, question_id, chunk = 6, ignoreCN = true) => {
     const codes = [];
-    const attempts = submissions.map(({ user, questions }) => (
+    const attempts = submissions.map(({ user, questions, rankPage }) => (
         {
             user,
-            question: questions.find(q => q.question_id == question_id && (!ignoreCN || q.data_region !== "CN"))
+            question: questions.find(q => q.question_id == question_id && (!ignoreCN || q.data_region !== "CN")),
+            rankPage,
         })
     ).filter(({ question }) => question);
 
@@ -172,13 +173,14 @@ const fetchAllSubmissions = async (submissions, question_id, chunk = 6, ignoreCN
 
     const promises = [];
     for (let i = 0; i < attempts.length; i++) {
-        const { user, question } = attempts[i];
+        const { user, question, rankPage } = attempts[i];
         promises.push(fetchSubmission(
             question.submission_id,
             user,
+            rankPage,
             DIR_QUESTION,
             question.data_region
-        ).then(code => codes.push(code)).finally(() => bar.increment()));
+        ).then(code => code && codes.push(code)).finally(() => bar.increment()));
         if (i % chunk === 0) {
             await Promise.all(promises);
             promises.length = 0;
@@ -193,16 +195,18 @@ const publish = (round, problemName, pairs, tolerance = 0.9) => {
     const breakPath = (path) => path.split("/")[path.split("/").length - 1].split(":");
     const done = new Set();
     const matches = pairs.filter(pair => pair.similarity >= tolerance).map(pair => ({
-        user1: breakPath(pair.leftFile.path)[0],
-        submission1: breakPath(pair.leftFile.path)[1].split(".")[0],
-        user2: breakPath(pair.rightFile.path)[0],
-        submission2: breakPath(pair.rightFile.path)[1].split(".")[0],
+        user1: breakPath(pair.leftFile.path)[1],
+        submission1: breakPath(pair.leftFile.path)[2].split(".")[0],
+        rank1: breakPath(pair.leftFile.path)[0],
+        user2: breakPath(pair.rightFile.path)[1],
+        submission2: breakPath(pair.rightFile.path)[2].split(".")[0],
+        rank2: breakPath(pair.rightFile.path)[0],
         similarity: pair.similarity
     })).filter(({ user1, user2 }) => user1 !== user2).toSorted((a, b) => b.similarity - a.similarity);
     const rows = [];
-    matches.forEach(({ user1, submission1, user2, submission2, similarity }) => {
+    matches.forEach(({ user1, submission1, rank1, user2, submission2, rank2, similarity }) => {
         if (!done.has(user1) || !done.has(user2)) {
-            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/) (${(similarity * 100).toPrecision(4)} %)`);
+            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/) (${(similarity * 100).toPrecision(4)} %)   > [Report \`${user1}\`](https://leetcode.com/contest/${round}/ranking/${rank1}/) [Report \`${user2}\`](https://leetcode.com/contest/${round}/ranking/${rank2}/)`);
             done.add(user1);
             done.add(user2);
         }
