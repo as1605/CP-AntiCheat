@@ -39,7 +39,7 @@ const fetchQuestions = async (retry = true) => {
     return data.questions;
 }
 
-const fetchPage = async (page, minSolved = 4, retry = true) => {
+const fetchPage = async (page, minSolved = 1, retry = true) => {
     const path = DIR_SUBMISSIONS + "/" + page + ".json";
     if (fs.existsSync(path)) {
         return JSON.parse(fs.readFileSync(path));
