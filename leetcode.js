@@ -206,7 +206,15 @@ const publish = (round, problemName, pairs, tolerance = 0.9) => {
     const rows = [];
     matches.forEach(({ user1, submission1, rank1, user2, submission2, rank2, similarity }) => {
         if (!done.has(user1) || !done.has(user2)) {
-            rows.push(`- [${user1}](https://leetcode.com/${user1})'s [${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/) matches [${user2}](https://leetcode.com/${user2})'s [${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/) (${(similarity * 100).toPrecision(4)} %)   > [Report \`${user1}\`](https://leetcode.com/contest/${round}/ranking/${rank1}/) [Report \`${user2}\`](https://leetcode.com/contest/${round}/ranking/${rank2}/)`);
+            rows.push([
+                `[${user1}](https://leetcode.com/${user1})`,
+                `[${submission1}](https://leetcode.com/contest/${round}/submissions/detail/${submission1}/)`,
+                `[${rank1}](https://leetcode.com/contest/${round}/ranking/${rank1}/)`,
+                `[${user2}](https://leetcode.com/${user2})`,
+                `[${submission2}](https://leetcode.com/contest/${round}/submissions/detail/${submission2}/)`,
+                `[${rank2}](https://leetcode.com/contest/${round}/ranking/${rank2}/)`,
+                (similarity * 100).toPrecision(4) + " %"
+            ].join("|"));
             done.add(user1);
             done.add(user2);
         }
@@ -215,7 +223,14 @@ const publish = (round, problemName, pairs, tolerance = 0.9) => {
 
     fs.writeFileSync(`docs/leetcode/${round}.md`, `# Cheating Report for LeetCode Round [${round}](https://leetcode.com/contest/${round}/)
 
+Here are the matching submissions with a similarity of ${tolerance * 100} % or more. The table below shows the users, their submissions, and the ranklist they are in. The last column shows the similarity percentage between the two submissions. 
+
+Use the ranklist link to find the users to report!
+
 ## Problem ${problemName}
+
+|User1|Submission|Ranklist|User2|Submission|Ranklist|Match|
+|---|---|---|---|---|---|---|
 ` + rows.join("\n"));
 
     const old = fs.readFileSync("docs/README.md");
