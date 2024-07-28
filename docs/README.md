@@ -8,3 +8,4 @@ Check out the source code here: [https://github.com/as1605/CP-AntiCheat/](https:
 - LeetCode Round [weekly-contest-406](leetcode/weekly-contest-406): **408** Cheaters!
 - LeetCode Round [weekly-contest-405](leetcode/weekly-contest-405): **157** Cheaters!
 - LeetCode Round [weekly-contest-407](leetcode/weekly-contest-407): **84** Cheaters!
+- LeetCode Round [weekly-contest-408](leetcode/weekly-contest-408): **604** Cheaters!
