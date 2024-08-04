@@ -286,4 +286,5 @@ const run = async () => {
     console.log("=== Results ===", "docs/leetcode/" + CONTEST_NAME + ".md");
 }
 
-run();
+await run();
+driver.quit()
